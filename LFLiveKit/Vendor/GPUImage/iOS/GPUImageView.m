@@ -230,38 +230,34 @@
 #pragma mark -
 #pragma mark Handling fill mode
 
-- (void)recalculateViewGeometry;
-{
-    runSynchronouslyOnVideoProcessingQueue(^{
+- (void)recalculateViewGeometry {
+    // 🔹 Gọi trên main thread để an toàn với UIKit
+    dispatch_async(dispatch_get_main_queue(), ^{
         CGFloat heightScaling, widthScaling;
         
         CGSize currentViewSize = self.bounds.size;
-        
-        //    CGFloat imageAspectRatio = inputImageSize.width / inputImageSize.height;
-        //    CGFloat viewAspectRatio = currentViewSize.width / currentViewSize.height;
-        
+        if (CGSizeEqualToSize(currentViewSize, CGSizeZero) ||
+            CGSizeEqualToSize(inputImageSize, CGSizeZero)) {
+            return;
+        }
+
         CGRect insetRect = AVMakeRectWithAspectRatioInsideRect(inputImageSize, self.bounds);
         
-        switch(_fillMode)
-        {
+        switch (_fillMode) {
             case kGPUImageFillModeStretch:
-            {
                 widthScaling = 1.0;
                 heightScaling = 1.0;
-            }; break;
+                break;
             case kGPUImageFillModePreserveAspectRatio:
-            {
                 widthScaling = insetRect.size.width / currentViewSize.width;
                 heightScaling = insetRect.size.height / currentViewSize.height;
-            }; break;
+                break;
             case kGPUImageFillModePreserveAspectRatioAndFill:
-            {
-                //            CGFloat widthHolder = insetRect.size.width / currentViewSize.width;
                 widthScaling = currentViewSize.height / insetRect.size.height;
                 heightScaling = currentViewSize.width / insetRect.size.width;
-            }; break;
+                break;
         }
-        
+
         imageVertices[0] = -widthScaling;
         imageVertices[1] = -heightScaling;
         imageVertices[2] = widthScaling;
@@ -271,14 +267,8 @@
         imageVertices[6] = widthScaling;
         imageVertices[7] = heightScaling;
     });
-    
-//    static const GLfloat imageVertices[] = {
-//        -1.0f, -1.0f,
-//        1.0f, -1.0f,
-//        -1.0f,  1.0f,
-//        1.0f,  1.0f,
-//    };
 }
+
 
 - (void)setBackgroundColorRed:(GLfloat)redComponent green:(GLfloat)greenComponent blue:(GLfloat)blueComponent alpha:(GLfloat)alphaComponent;
 {
@@ -409,24 +399,23 @@
     inputRotation = newInputRotation;
 }
 
-- (void)setInputSize:(CGSize)newSize atIndex:(NSInteger)textureIndex;
-{
+- (void)setInputSize:(CGSize)newSize atIndex:(NSInteger)textureIndex {
     runSynchronouslyOnVideoProcessingQueue(^{
         CGSize rotatedSize = newSize;
-        
-        if (GPUImageRotationSwapsWidthAndHeight(inputRotation))
-        {
+        if (GPUImageRotationSwapsWidthAndHeight(inputRotation)) {
             rotatedSize.width = newSize.height;
             rotatedSize.height = newSize.width;
         }
-        
-        if (!CGSizeEqualToSize(inputImageSize, rotatedSize))
-        {
+
+        if (!CGSizeEqualToSize(inputImageSize, rotatedSize)) {
             inputImageSize = rotatedSize;
-            [self recalculateViewGeometry];
         }
     });
+
+    // 🔹 Gọi lại geometry sau khi cập nhật inputSize
+    [self recalculateViewGeometry];
 }
+
 
 - (CGSize)maximumOutputSize;
 {
